@@ -8,7 +8,6 @@ from pathlib import Path # usado pra renomear o arquivo pdf
 pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 
 with open(r"c:\Users\Murilo\OneDrive\Documents\Digitalizados\doc001.pdf") as doc: # abre o pdf
-    page = doc[0] # pega a primeira página do pdf
     img_dpi = Matrix(6.7, 6.7) # aumenta a resolução da imagem
     img_pixels = doc[0].get_pixmap(matrix=img_dpi) # converte a primeira página do pdf em imagem
     img = Image.frombytes("RGB", [img_pixels.width, img_pixels.height], img_pixels.samples) # converte a imagem em um objeto PIL
@@ -27,19 +26,21 @@ with open(r"c:\Users\Murilo\OneDrive\Documents\Digitalizados\doc001.pdf") as doc
         else:
             numero_NF = "undefined" # define o número da nota fiscal como "não encontrada" se não for encontrado
 
-    while numero_NF[0] == '0':
+    while numero_NF[0] == '0': # remove os zeros à esquerda do número da nota fiscal
         numero_NF = numero_NF[1:]
     
-    procurar_PO = search(r"PO[\s]*(\d+)", txt) # procura o número do pedido de compra no texto da imagem
+    procurar_PO = search(r"PO\s+(\d+)\s+(?:PARCIAL\s+)?VENCIMENTO", txt) # procura o número do pedido de compra no texto da imagem
+    if not procurar_PO:
+        procurar_PO = search(r"PO\s+(\d+)", txt) # caso a PO não tenha sido encontrada, procura novamente sem a palavra "VENCIMENTO"
+
     if procurar_PO:
-        if "PO" in txt: # verifica se o texto contém a palavra "PO"
-            numero_PO = procurar_PO.group(1) # pega o número do pedido de compra encontrado
-            if "PARCIAL" in txt: # verifica se a nota fiscal é parcial
-                numero_PO = f"PO {numero_PO} PARCIAL" # adiciona a palavra "PARCIAL" ao número da PO
-            else:
-                numero_PO = f"PO {numero_PO}" # define o número da PO como está
+        numero_PO = procurar_PO.group(1) # pega o número do pedido de compra encontrado
+        if "PARCIAL" in txt: # verifica se a nota fiscal é parcial
+            numero_PO = f"PO {numero_PO} PARCIAL" # adiciona a palavra "PARCIAL" ao número da PO
+        else:
+            numero_PO = f"PO {numero_PO}" # define o número da PO como está
     else:
-        numero_PO = "undefined" # define o número da PO como "PO não encontrada" se não for encontrada
+        numero_PO = "undefined" # define o número da PO como "undefined" se não for encontrada
 
 Path(r"c:\Users\Murilo\OneDrive\Documents\Digitalizados\doc001.pdf").rename( # renomeia o arquivo pdf com o número da NF e da PO
     rf"c:\Users\Murilo\OneDrive\Documents\Digitalizados\NF {numero_NF} {numero_PO}.pdf"
