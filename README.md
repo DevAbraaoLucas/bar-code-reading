@@ -1,5 +1,5 @@
 # bar-code-reading
-This repository contains the code I created to automatically rename files. I did this because, at work, I need to scan and organize 150–200 sales invoices for delivered orders into a shared folder each week; to reduce manual work, this script renames each invoice using the invoice number and the PO (Purchase Order) number.
+Este repositório contém o código que criei para renomear arquivos automaticamente. Fiz isso porque, no trabalho, preciso escanear e organizar de 150 a 200 notas fiscais de venda de pedidos entregues numa pasta compartilhada toda semana; para reduzir o trabalho manual, este script renomeia cada nota com o número da NF e o número da PO (pedido de compra).
 
 ## Como funciona
 - **Número da NF**: lido do código de barras (chave de acesso, validada pelo dígito verificador). Se falhar, usa OCR na chave impressa ou no "Nº:" do cabeçalho.
