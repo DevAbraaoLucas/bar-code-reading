@@ -7,7 +7,7 @@ from pathlib import Path # usado pra listar e renomear os arquivos pdf
 import pymupdf # usado pra abrir o pdf e extrair a imagem
 import pytesseract # usado pra ler o texto da imagem
 from PIL import Image # usado pra manipular a imagem
-from pyzbar.pyzbar import decode # usado pra decodificar o código de barras
+from pyzbar.pyzbar import ZBarSymbol, decode # usado pra decodificar o código de barras
 
 PASTA = Path(r"c:\Users\Murilo\OneDrive\Documents\Digitalizados") # pasta onde o scanner salva os pdfs
 PADRAO_SCANNER = "doc*.pdf" # nome dos arquivos gerados pelo scanner (doc001.pdf, doc002.pdf...)
@@ -57,7 +57,9 @@ def numero_da_chave(chave):
 
 def ler_numero_nf(img):
     # 1ª tentativa: código de barras (só aceita se for uma chave de acesso válida)
-    for codigo in decode(img):
+    # o código de barras da NF-e é sempre CODE128. procurar só esse tipo é mais rápido
+    # e evita os avisos "WARNING: zbar decoder databar.c" no terminal
+    for codigo in decode(img, symbols=[ZBarSymbol.CODE128]):
         chave = codigo.data.decode("utf-8", errors="ignore")
         if chave_valida(chave):
             return numero_da_chave(chave)
