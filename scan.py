@@ -96,14 +96,14 @@ def ler_numero_po(img):
 
     for imagem in tentativas:
         texto = pytesseract.image_to_string(imagem, lang="por", config="--psm 6")
-        # o "O" de "PO" às vezes sai como "0", "C" ou "Q" no OCR quando a impressão está fraca
-        achado = re.search(r"\bP[O0CQ]\s*[:.]?\s*(\d[\d/.,]*\d)", texto)
-        if not achado:
-            continue
-        numero = re.sub(r"\D", "", achado.group(1)) # remove lixo que o OCR coloca no meio dos dígitos
-        if len(numero) == 6: # as POs têm 6 dígitos; se não tiver, provavelmente o OCR errou e tenta de novo
-            parcial = "PARCIAL" in texto[achado.start():].upper()
-            return f"{numero} PARCIAL" if parcial else numero
+        # o "O" de "PO" às vezes sai como "0", "C" ou "Q" no OCR quando a impressão está fraca.
+        # a PO tem 5 ou 6 dígitos e precisa vir "limpa", seguida de espaço: se o OCR colocar lixo
+        # no meio (ex.: "5187/63"), não aceita e tenta de novo, pra não gerar um número errado
+        achado = re.search(r"\bP[O0CQ]\s*[:.]?\s*(\d{5,6})(?=\s)", texto)
+        if achado:
+            resto_da_linha = texto[achado.end():].split("\n")[0]
+            parcial = "PARCIAL" in resto_da_linha.upper()
+            return f"{achado.group(1)} PARCIAL" if parcial else achado.group(1)
 
     return None
 
