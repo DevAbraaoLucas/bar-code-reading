@@ -96,7 +96,8 @@ def ler_numero_po(img):
 
     for imagem in tentativas:
         texto = pytesseract.image_to_string(imagem, lang="por", config="--psm 6")
-        achado = re.search(r"\bP[O0]\s*[:.]?\s*(\d[\d/.,]*\d)", texto)
+        # o "O" de "PO" às vezes sai como "0", "C" ou "Q" no OCR quando a impressão está fraca
+        achado = re.search(r"\bP[O0CQ]\s*[:.]?\s*(\d[\d/.,]*\d)", texto)
         if not achado:
             continue
         numero = re.sub(r"\D", "", achado.group(1)) # remove lixo que o OCR coloca no meio dos dígitos
