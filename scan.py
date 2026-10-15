@@ -2,11 +2,12 @@ import io # usado pra ler a imagem embutida no pdf
 import logging # usado pra salvar um log com o resultado de cada arquivo
 import re # usado pra procurar os números no texto da imagem
 import sys # usado pra ler o argumento "refazer" da linha de comando
+from collections import Counter # usado pra contar os votos das leituras da PO
 from pathlib import Path # usado pra listar e renomear os arquivos pdf
 
 import pymupdf # usado pra abrir o pdf e extrair a imagem
 import pytesseract # usado pra ler o texto da imagem
-from PIL import Image # usado pra manipular a imagem
+from PIL import Image, ImageFilter, ImageOps # usado pra manipular a imagem
 from pyzbar.pyzbar import ZBarSymbol, decode # usado pra decodificar o código de barras
 
 PASTA = Path(r"c:\Users\Murilo\OneDrive\Documents\Digitalizados") # pasta onde o scanner salva os pdfs
@@ -84,28 +85,69 @@ def ler_numero_nf(img):
     return None
 
 
-def ler_numero_po(img):
+# leituras feitas na PO: (tratamento da imagem, zoom). foram escolhidas testando várias notas reais:
+# nenhuma dessas leituras errou a PO nos testes, mas cada uma às vezes não consegue ler
+LEITURAS_PO = [
+    ("contraste", 1),
+    ("original", 1.5),
+    ("engrossado", 1.5),
+    ("contraste", 2),
+    ("contraste", 2.5),
+    ("engrossado", 2.5),
+    ("engrossado", 3),
+]
+
+
+def preparar(rodape, tratamento, zoom):
+    if tratamento in ("contraste", "engrossado"):
+        rodape = ImageOps.autocontrast(rodape, cutoff=1) # deixa o texto cinza claro mais escuro
+    if tratamento == "engrossado":
+        rodape = rodape.filter(ImageFilter.MinFilter(3)) # engrossa as letras finas da fonte
+    if zoom != 1:
+        rodape = rodape.resize((int(rodape.width * zoom), int(rodape.height * zoom)), Image.LANCZOS)
+    return rodape
+
+
+def ler_numero_po(img, nome=""):
     # a PO fica no quadro "DADOS ADICIONAIS", no rodapé da página.
     # fazer o OCR só nesse pedaço é bem mais rápido e mais preciso do que na página inteira
     largura, altura = img.size
     rodape = img.convert("L").crop((0, int(altura * 0.80), int(largura * 0.70), altura))
 
-    # tenta alguns tamanhos diferentes, porque o OCR às vezes confunde um dígito (ex.: "7" vira "/")
-    tentativas = [rodape.resize((int(rodape.width * zoom), int(rodape.height * zoom)), Image.LANCZOS) for zoom in (1.5, 2, 1)]
-    tentativas.append(img.convert("L")) # último recurso: página inteira
-
-    for imagem in tentativas:
-        texto = pytesseract.image_to_string(imagem, lang="por", config="--psm 6")
+    # a fonte desse quadro é fina e clara, e o OCR às vezes troca um dígito por outro (ex.: "3" vira "2")
+    # sem deixar nenhum sinal de erro. por isso a PO é lida várias vezes, de jeitos diferentes, e vence
+    # o número mais votado. se as leituras não concordarem o suficiente, fica "undefined" (melhor que errado)
+    votos = Counter()
+    parcial = Counter()
+    for tratamento, zoom in LEITURAS_PO:
+        texto = pytesseract.image_to_string(preparar(rodape, tratamento, zoom), lang="por", config="--psm 6")
         # o "O" de "PO" às vezes sai como "0", "C" ou "Q" no OCR quando a impressão está fraca.
         # a PO tem 5 ou 6 dígitos e precisa vir "limpa", seguida de espaço: se o OCR colocar lixo
-        # no meio (ex.: "5187/63"), não aceita e tenta de novo, pra não gerar um número errado
+        # no meio (ex.: "5187/63"), essa leitura é descartada
         achado = re.search(r"\bP[O0CQ]\s*[:.]?\s*(\d{5,6})(?=\s)", texto)
-        if achado:
-            resto_da_linha = texto[achado.end():].split("\n")[0]
-            parcial = "PARCIAL" in resto_da_linha.upper()
-            return f"{achado.group(1)} PARCIAL" if parcial else achado.group(1)
+        if not achado:
+            continue
+        numero = achado.group(1)
+        votos[numero] += 1
+        resto_da_linha = texto[achado.end():].split("\n")[0]
+        if "PARCIAL" in resto_da_linha.upper():
+            parcial[numero] += 1
 
-    return None
+        # caso fácil: 3 leituras iguais e nenhuma diferente, não precisa continuar
+        if len(votos) == 1 and votos[numero] >= 3:
+            break
+
+    if not votos:
+        return None
+
+    mais_votados = votos.most_common(2)
+    numero, qtd = mais_votados[0]
+    segundo = mais_votados[1][1] if len(mais_votados) > 1 else 0
+    if len(votos) > 1:
+        logging.info(f"{nome}: leituras da PO divergiram {dict(votos)}")
+    if qtd < 3 or qtd < 2 * segundo: # precisa de pelo menos 3 votos e o dobro do segundo colocado
+        return None
+    return f"{numero} PARCIAL" if parcial[numero] else numero
 
 
 def nome_livre(destino):
@@ -122,7 +164,7 @@ def processar(pdf):
     img = carregar_imagem(pdf)
 
     numero_NF = ler_numero_nf(img) or "undefined"
-    numero_PO = ler_numero_po(img)
+    numero_PO = ler_numero_po(img, pdf.name)
     numero_PO = f"PO {numero_PO}" if numero_PO else "undefined"
 
     destino = pdf.with_name(f"NF {numero_NF} {numero_PO}.pdf")
