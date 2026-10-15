@@ -147,7 +147,11 @@ def ler_numero_po(img, nome=""):
         logging.info(f"{nome}: leituras da PO divergiram {dict(votos)}")
     if qtd < 3 or qtd < 2 * segundo: # precisa de pelo menos 3 votos e o dobro do segundo colocado
         return None
-    return f"{numero} PARCIAL" if parcial[numero] else numero
+    if parcial[numero]:
+        numero = f"{numero} PARCIAL"
+    if len(votos) > 1: # venceu, mas alguma leitura deu outro número: marca pra conferir na mão
+        numero = f"{numero} conferir"
+    return numero
 
 
 def nome_livre(destino):

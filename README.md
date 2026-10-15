@@ -4,7 +4,7 @@ Este repositório contém o código que criei para renomear arquivos automaticam
 ## Como funciona
 - **Número da NF**: lido do código de barras (chave de acesso, validada pelo dígito verificador). Se falhar, usa OCR na chave impressa ou no "Nº:" do cabeçalho.
 - **Número da PO**: OCR só no quadro "Dados Adicionais" (rodapé). A PO é lida várias vezes, com tratamentos de imagem diferentes, e vence o número mais votado; se as leituras não concordarem, fica `undefined` (melhor que um número errado).
-- O arquivo é renomeado para `NF 13606 PO 518763.pdf`. Se não achar algo, fica `undefined`. Se o nome já existir, adiciona `(2)`, `(3)`...
+- O arquivo é renomeado para `NF 13606 PO 518763.pdf`. Se não achar algo, fica `undefined`. Se as leituras da PO divergirem, o nome ganha `conferir` no final (ex.: `NF 13680 PO 513382 conferir.pdf`) pra você conferir na mão. Se o nome já existir, adiciona `(2)`, `(3)`...
 - Cada execução grava o resultado (e erros) em `scan_log.txt`, na mesma pasta do script.
 
 ## Uso
