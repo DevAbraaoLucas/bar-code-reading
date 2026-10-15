@@ -14,6 +14,7 @@ PASTA = Path(r"c:\Users\Murilo\OneDrive\Documents\Digitalizados") # pasta onde o
 PADRAO_SCANNER = "doc*.pdf" # nome dos arquivos gerados pelo scanner (doc001.pdf, doc002.pdf...)
 PADRAO_REFAZER = "NF * undefined*.pdf" # arquivos que ficaram com "undefined" e podem ser reprocessados
 TESSERACT = Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
+LARGURA_300DPI = 2480 # largura em pixels de uma folha A4 escaneada em 300 DPI (a resolução usada nos testes)
 
 if TESSERACT.exists(): # só configura o caminho se o tesseract estiver instalado nesse lugar
     pytesseract.pytesseract.tesseract_cmd = str(TESSERACT)
@@ -32,12 +33,18 @@ def carregar_imagem(pdf):
         pagina = doc[0]
         imagens = pagina.get_images()
         if imagens:
-            # pega a imagem original que o scanner salvou dentro do pdf (300 DPI), sem ampliar.
+            # pega a imagem original que o scanner salvou dentro do pdf, sem ampliar.
             # ampliar demais (o antigo Matrix(6.7, 6.7)) deixava o código de barras ilegível pro pyzbar
             dados = doc.extract_image(imagens[0][0])["image"]
             return Image.open(io.BytesIO(dados)).convert("RGB")
         pixmap = pagina.get_pixmap(dpi=300) # caso o pdf não tenha imagem embutida, converte a página em 300 DPI
         return Image.frombytes("RGB", [pixmap.width, pixmap.height], pixmap.samples)
+
+
+def escala(img):
+    """Quanto a imagem precisa ser multiplicada pra ficar no tamanho de 300 DPI (ex.: 0.5 se foi escaneada em 600 DPI)."""
+    fator = LARGURA_300DPI / img.width
+    return 1 if 0.95 < fator < 1.05 else fator # diferença pequena (ex.: 2478 x 2480 pixels) é ignorada
 
 
 def chave_valida(chave):
@@ -60,10 +67,14 @@ def ler_numero_nf(img):
     # 1ª tentativa: código de barras (só aceita se for uma chave de acesso válida)
     # o código de barras da NF-e é sempre CODE128. procurar só esse tipo é mais rápido
     # e evita os avisos "WARNING: zbar decoder databar.c" no terminal
-    for codigo in decode(img, symbols=[ZBarSymbol.CODE128]):
-        chave = codigo.data.decode("utf-8", errors="ignore")
-        if chave_valida(chave):
-            return numero_da_chave(chave)
+    tentativas = [img]
+    if escala(img) < 0.9: # imagem muito grande (escaneada acima de 300 DPI) atrapalha o pyzbar: tenta também reduzida
+        tentativas.append(img.resize((LARGURA_300DPI, int(img.height * escala(img))), Image.LANCZOS))
+    for imagem in tentativas:
+        for codigo in decode(imagem, symbols=[ZBarSymbol.CODE128]):
+            chave = codigo.data.decode("utf-8", errors="ignore")
+            if chave_valida(chave):
+                return numero_da_chave(chave)
 
     # se o código de barras falhar, faz o OCR da página inteira (é a parte mais lenta, por isso fica por último)
     texto = pytesseract.image_to_string(img, lang="por")
@@ -98,11 +109,14 @@ LEITURAS_PO = [
 ]
 
 
-def preparar(rodape, tratamento, zoom):
+def preparar(rodape, tratamento, zoom, fator=1):
+    # os zooms foram calibrados em 300 DPI; "fator" corrige isso se o scanner usar outra resolução
+    zoom = zoom * fator
     if tratamento in ("contraste", "engrossado"):
         rodape = ImageOps.autocontrast(rodape, cutoff=1) # deixa o texto cinza claro mais escuro
     if tratamento == "engrossado":
-        rodape = rodape.filter(ImageFilter.MinFilter(3)) # engrossa as letras finas da fonte
+        tamanho = max(3, round(3 / fator) // 2 * 2 + 1) # 3 em 300 DPI, 7 em 600 DPI (precisa ser ímpar)
+        rodape = rodape.filter(ImageFilter.MinFilter(tamanho)) # engrossa as letras finas da fonte
     if zoom != 1:
         rodape = rodape.resize((int(rodape.width * zoom), int(rodape.height * zoom)), Image.LANCZOS)
     return rodape
@@ -120,7 +134,7 @@ def ler_numero_po(img, nome=""):
     votos = Counter()
     parcial = Counter()
     for tratamento, zoom in LEITURAS_PO:
-        texto = pytesseract.image_to_string(preparar(rodape, tratamento, zoom), lang="por", config="--psm 6")
+        texto = pytesseract.image_to_string(preparar(rodape, tratamento, zoom, escala(img)), lang="por", config="--psm 6")
         # o "O" de "PO" às vezes sai como "0", "C" ou "Q" no OCR quando a impressão está fraca.
         # a PO tem 5 ou 6 dígitos e precisa vir "limpa", seguida de espaço: se o OCR colocar lixo
         # no meio (ex.: "5187/63"), essa leitura é descartada
