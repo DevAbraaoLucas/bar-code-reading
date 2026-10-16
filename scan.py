@@ -138,9 +138,9 @@ def ler_numero_po(img, nome=""):
     for tratamento, zoom in LEITURAS_PO:
         texto = pytesseract.image_to_string(preparar(rodape, tratamento, zoom, escala(img)), lang="por", config="--psm 6")
         # o "O" de "PO" às vezes sai como "0", "C" ou "Q" no OCR quando a impressão está fraca.
-        # a PO tem 5 ou 6 dígitos e precisa vir "limpa", seguida de espaço: se o OCR colocar lixo
+        # a PO tem 5 ou 6 dígitos (ou 10, num cliente antigo) e precisa vir "limpa", seguida de espaço: se o OCR colocar lixo
         # no meio (ex.: "5187/63"), essa leitura é descartada
-        achado = re.search(r"\bP[O0CQ]\s*[:.]?\s*(\d{5,6})(?=\s)", texto)
+        achado = re.search(r"\bP[O0CQ]\s*[:.]?\s*(\d{10}|\d{5,6})(?=\s)", texto)
         if not achado:
             continue
         numero = achado.group(1)
