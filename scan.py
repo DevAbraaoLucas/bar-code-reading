@@ -159,10 +159,8 @@ def ler_numero_po(img, nome=""):
         resto_da_linha = texto[achado.end():].split("\n")[0]
         if "PARCIAL" in resto_da_linha.upper():
             parcial[numero] += 1
-
-        # caso fácil: 3 leituras iguais e nenhuma diferente, não precisa continuar
-        if len(votos) == 1 and votos[numero] >= 3:
-            break
+        # faz sempre todas as leituras (sem parar nas 3 primeiras iguais): numa folha mal escaneada
+        # as primeiras podem concordar no número errado, e só as outras revelam que há dúvida
 
     if not votos:
         return None

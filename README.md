@@ -10,7 +10,7 @@ Este repositório contém o código que criei para renomear arquivos automaticam
 ## Uso
 - `python scan.py` → renomeia os `doc*.pdf` gerados pelo scanner (o `rodar.vbs` faz isso).
 - `python scan.py refazer` → tenta de novo os arquivos que ficaram com `undefined` no nome.
-- `python scan.py auditar` → lê de novo todas as notas já renomeadas (`NF *.pdf`) e gera a planilha `auditoria.csv` com as que não batem com o nome. Não renomeia nada. Leva uns 3 segundos por nota.
+- `python scan.py auditar` → lê de novo todas as notas já renomeadas (`NF *.pdf`) e gera a planilha `auditoria.csv` com as que não batem com o nome. Não renomeia nada. Leva uns 5 a 6 segundos por nota.
 
 ## Instalação
 1. `pip install -r requirements.txt`
