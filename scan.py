@@ -1,3 +1,4 @@
+import csv # usado pra gerar a planilha da auditoria
 import io # usado pra ler a imagem embutida no pdf
 import logging # usado pra salvar um log com o resultado de cada arquivo
 import re # usado pra procurar os números no texto da imagem
@@ -13,6 +14,7 @@ from pyzbar.pyzbar import ZBarSymbol, decode # usado pra decodificar o código d
 PASTA = Path(r"c:\Users\Murilo\OneDrive\Documents\Digitalizados") # pasta onde o scanner salva os pdfs
 PADRAO_SCANNER = "doc*.pdf" # nome dos arquivos gerados pelo scanner (doc001.pdf, doc002.pdf...)
 PADRAO_REFAZER = "NF * undefined*.pdf" # arquivos que ficaram com "undefined" e podem ser reprocessados
+PADRAO_AUDITAR = "NF *.pdf" # todos os arquivos já renomeados, pra conferir se o nome está certo
 TESSERACT = Path(r"C:\Program Files\Tesseract-OCR\tesseract.exe")
 LARGURA_300DPI = 2480 # largura em pixels de uma folha A4 escaneada em 300 DPI (a resolução usada nos testes)
 
@@ -193,9 +195,73 @@ def processar(pdf):
     return destino
 
 
+def auditar():
+    """Lê de novo todas as notas já renomeadas e lista numa planilha as que não batem com o nome. Não renomeia nada."""
+    pdfs = sorted(PASTA.glob(PADRAO_AUDITAR))
+    planilha = Path(__file__).with_name("auditoria.csv")
+    contagem = Counter()
+
+    # "utf-8-sig" e ";" fazem o Excel em português abrir a planilha certinho, com acentos e colunas separadas
+    with open(planilha, "w", newline="", encoding="utf-8-sig") as arquivo:
+        escritor = csv.writer(arquivo, delimiter=";")
+        escritor.writerow(["Arquivo", "NF no nome", "NF lida", "PO no nome", "PO lida", "Situação"])
+
+        for i, pdf in enumerate(pdfs, start=1):
+            print(f"[{i}/{len(pdfs)}] {pdf.name}")
+            nome = pdf.stem
+            nf_nome = nome.split()[1] if len(nome.split()) > 1 else ""
+            po_nome = re.search(r"PO (\d+)", nome)
+            po_nome = po_nome.group(1) if po_nome else None
+            parcial_nome = "PARCIAL" in nome
+
+            try:
+                img = carregar_imagem(pdf)
+                nf_lida = ler_numero_nf(img)
+                po_lida_completa = ler_numero_po(img, pdf.name) or ""
+            except Exception as erro:
+                escritor.writerow([pdf.name, nf_nome, "", po_nome or "", "", f"erro ao ler o arquivo: {erro}"])
+                contagem["erro ao ler o arquivo"] += 1
+                continue
+            po_lida = po_lida_completa.split()[0] if po_lida_completa else None
+            parcial_lida = "PARCIAL" in po_lida_completa
+
+            problemas = []
+            if not nf_lida and not po_lida:
+                problemas.append("não parece NF") # documento que não é nota (ou ilegível)
+            else:
+                if nf_lida != nf_nome:
+                    problemas.append("NF diferente")
+                if po_nome and po_lida and po_nome != po_lida:
+                    problemas.append("PO diferente")
+                if po_nome and not po_lida:
+                    problemas.append("PO do nome não confirmada") # a leitura nova não conseguiu ler a PO
+                if not po_nome and po_lida:
+                    problemas.append("PO encontrada (nome está sem PO)")
+                if po_nome and po_lida and parcial_nome != parcial_lida:
+                    problemas.append("PARCIAL diferente")
+                if "conferir" in po_lida_completa:
+                    problemas.append("leituras da PO divergiram")
+
+            if problemas:
+                escritor.writerow([pdf.name, nf_nome, nf_lida or "", po_nome or "", po_lida_completa, "; ".join(problemas)])
+                arquivo.flush() # grava na hora, pra não perder o que já foi feito se o programa for interrompido
+                for problema in problemas:
+                    contagem[problema] += 1
+            else:
+                contagem["ok"] += 1
+
+    print(f"\nPronto! {len(pdfs)} arquivos conferidos. Planilha salva em: {planilha}")
+    for situacao, quantidade in contagem.most_common():
+        print(f"  {situacao}: {quantidade}")
+
+
 def main():
     # modo normal: renomeia os pdfs novos do scanner
     # "python scan.py refazer": tenta de novo os arquivos que ficaram com "undefined"
+    # "python scan.py auditar": confere todas as notas já renomeadas e gera a planilha auditoria.csv
+    if "auditar" in sys.argv[1:]:
+        auditar()
+        return
     padrao = PADRAO_REFAZER if "refazer" in sys.argv[1:] else PADRAO_SCANNER
     for pdf in sorted(PASTA.glob(padrao)):
         try:
