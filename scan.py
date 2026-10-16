@@ -8,7 +8,7 @@ from pathlib import Path # usado pra listar e renomear os arquivos pdf
 
 import pymupdf # usado pra abrir o pdf e extrair a imagem
 import pytesseract # usado pra ler o texto da imagem
-from PIL import Image, ImageFilter, ImageOps # usado pra manipular a imagem
+from PIL import Image, ImageChops, ImageFilter, ImageOps # usado pra manipular a imagem
 from pyzbar.pyzbar import ZBarSymbol, decode # usado pra decodificar o código de barras
 
 PASTA = Path(r"c:\Users\Murilo\OneDrive\Documents\Digitalizados") # pasta onde o scanner salva os pdfs
@@ -111,6 +111,17 @@ LEITURAS_PO = [
 ]
 
 
+def apagar_caneta(img):
+    """Pinta de branco tudo que é colorido (rabisco de caneta rosa, azul...). A impressão da nota é cinza/preta, então não é afetada."""
+    r, g, b = img.split()
+    maior = ImageChops.lighter(ImageChops.lighter(r, g), b)
+    menor = ImageChops.darker(ImageChops.darker(r, g), b)
+    colorido = ImageChops.subtract(maior, menor).point(lambda p: 255 if p > 50 else 0) # diferença grande entre as cores = pixel colorido
+    limpa = img.copy()
+    limpa.paste((255, 255, 255), mask=colorido)
+    return limpa
+
+
 def preparar(rodape, tratamento, zoom, fator=1):
     # os zooms foram calibrados em 300 DPI; "fator" corrige isso se o scanner usar outra resolução
     zoom = zoom * fator
@@ -128,7 +139,7 @@ def ler_numero_po(img, nome=""):
     # a PO fica no quadro "DADOS ADICIONAIS", no rodapé da página.
     # fazer o OCR só nesse pedaço é bem mais rápido e mais preciso do que na página inteira
     largura, altura = img.size
-    rodape = img.convert("L").crop((0, int(altura * 0.80), int(largura * 0.70), altura))
+    rodape = apagar_caneta(img.crop((0, int(altura * 0.80), int(largura * 0.70), altura))).convert("L")
 
     # a fonte desse quadro é fina e clara, e o OCR às vezes troca um dígito por outro (ex.: "3" vira "2")
     # sem deixar nenhum sinal de erro. por isso a PO é lida várias vezes, de jeitos diferentes, e vence
