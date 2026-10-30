@@ -1,5 +1,5 @@
 # bar-code-reading
-Este repositório contém o código que criei para renomear arquivos automaticamente. Fiz isso porque, no trabalho, preciso escanear e organizar de 150 a 200 notas fiscais de venda de pedidos entregues numa pasta compartilhada toda semana; para reduzir o trabalho manual, este script renomeia cada nota com o número da NF e o número da PO (pedido de compra).
+Este repositório contém o código que criei para renomear arquivos automaticamente. Fiz isso porque, no trabalho, preciso escanear e organizar de 200 a 300 notas fiscais de venda de pedidos entregues numa pasta compartilhada toda semana; para reduzir o trabalho manual, este script renomeia cada nota com o número da NF e o número da PO (pedido de compra).
 
 ## Como funciona
 - **Número da NF**: lido do código de barras (chave de acesso, validada pelo dígito verificador). Se falhar, usa OCR na chave impressa ou no "Nº:" do cabeçalho.
