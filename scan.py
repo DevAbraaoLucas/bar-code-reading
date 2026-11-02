@@ -87,7 +87,7 @@ def ler_numero_nf(img):
         if chave_valida(chave):
             return numero_da_chave(chave)
 
-    # 3ª tentativa: "Nº: 13606" do cabeçalho, ou o número logo abaixo de "FATURA ... NÚMERO"
+    # 3ª tentativa: "Nº: 12345" do cabeçalho, ou o número logo abaixo de "FATURA ... NÚMERO"
     # (o regex antigo às vezes pegava o ano de uma data, gerando "NF 2026")
     achado = re.search(r"N[º°o]\s*:\s*(\d{3,9})\b", texto) or re.search(
         r"FATURA[\s\S]{0,200}?N[UÚ]MERO[^\n]*\n\s*(\d{3,9})\b", texto
@@ -150,7 +150,7 @@ def ler_numero_po(img, nome=""):
         texto = pytesseract.image_to_string(preparar(rodape, tratamento, zoom, escala(img)), lang="por", config="--psm 6")
         # o "O" de "PO" às vezes sai como "0", "C" ou "Q" no OCR quando a impressão está fraca.
         # a PO tem 5 ou 6 dígitos (ou 10, num cliente antigo) e precisa vir "limpa", seguida de espaço: se o OCR colocar lixo
-        # no meio (ex.: "5187/63"), essa leitura é descartada
+        # no meio (ex.: "5001/23"), essa leitura é descartada
         achado = re.search(r"\bP[O0CQ]\s*[:.]?\s*(\d{10}|\d{5,6})(?=\s)", texto)
         if not achado:
             continue
